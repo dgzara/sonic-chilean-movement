@@ -1,0 +1,6 @@
+library(igraph)
+library(xtable)
+library(rem)
+library(ggplot2)
+library(grid)
+library(gridExtra)
