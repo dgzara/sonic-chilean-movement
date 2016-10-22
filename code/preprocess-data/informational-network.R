@@ -8,13 +8,13 @@ source(file='extract-functions.R')
 retweet_definition <- " text LIKE '%retweet @%' OR  text LIKE'%_ rt @%' OR  text LIKE'%RT @%' OR text LIKE'rt @%' OR  text LIKE'%Rt @%' OR  text LIKE'%rT @%' OR  text LIKE'%thx @%' OR  text LIKE'%MT @%' OR text LIKE'%retweeting @%'"
 retweet_definition_nested <- " text NOT LIKE '%retweet @%' AND text NOT LIKE '%_ rt @%' AND text NOT LIKE '%RT @%' AND text NOT LIKE 'rt @%' AND text NOT LIKE '%Rt @%' AND text NOT LIKE '%rT @%' AND text NOT LIKE '%thx @%' AND text NOT LIKE '%MT @%' AND text NOT LIKE '%retweeting @%'"
 
+# Arreglamos UTF-8
+dbSendQuery(mydb, "SET NAMES utf8")
+
 # List of hashtags
 sql <- paste("SELECT DISTINCT hashtag FROM hashtags")
 hashtags <- dbGetQuery(mydb, sql)
 hashtags <- sort(unique(unlist(hashtags$hashtag, use.names = FALSE)))
-
-# Arreglamos UTF-8
-dbSendQuery(mydb, "SET NAMES utf8")
 
 # Borramos la base de datos
 q <- "TRUNCATE TABLE hashtags_network;"
@@ -24,6 +24,7 @@ dbSendQuery(mydb, q)
 for(i in 1:length(hashtags))
 {
   print(hashtags[i])
+  print(Sys.time())
   
   # First Get the mention networks in reply
   sql <- paste("SELECT id, hashtag, user_screen_name as user, text, created_at, user_profile_location, user_followers_count, user_time_zone   
@@ -42,6 +43,10 @@ for(i in 1:length(hashtags))
                FROM hashtags
                WHERE text LIKE '%@%' AND hashtag = '",hashtags[i],"' AND text NOT LIKE '@%' AND (",retweet_definition_nested,");",sep="")
   text_reply_mention <- dbGetQuery(mydb, sql)
+  
+  # Message
+  print(paste(hashtags[i],": constructing reply network"))
+  print(Sys.time())
   
   # Build replies network
   n <- nrow(text_reply)
@@ -68,6 +73,10 @@ for(i in 1:length(hashtags))
       l == 0
     }
   }
+  
+  # Message
+  print(paste(hashtags[i],": constructing retweet network"))
+  print(Sys.time())
   
   # Build retweets network
   n <- nrow(text_reply_retweet)
@@ -108,6 +117,10 @@ for(i in 1:length(hashtags))
       }
     }
   }
+  
+  # Message
+  print(paste(hashtags[i],": constructing mentions network"))
+  print(Sys.time())
   
   # Build mentions network
   n <- nrow(text_reply_mention)
