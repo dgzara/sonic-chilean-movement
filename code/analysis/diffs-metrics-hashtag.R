@@ -1,6 +1,7 @@
 folder <- paste0(getwd(),"/code/analysis")
 setwd(folder)
 library(xtable)
+library(lsr)
 source(file='../libraries.R')
 source(file='../dbConnect.R')
 source(file='../accountsList.R')
@@ -22,15 +23,15 @@ tweets.network <- dbGetQuery(mydb, q)
 hashtags <- sort(unique(unlist(tweets$hashtag, use.names = FALSE)))
 
 # Solo dejamos a los líderes, organizaciones, y common-people
-tweets <- tweets[!(tweets$user %in% movs),]
-tweets <- tweets[!(tweets$user %in% celebrities),]
-tweets <- tweets[!(tweets$user %in% media),]
-tweets.network <- tweets.network[!(tweets.network$source %in% movs),]
-tweets.network <- tweets.network[!(tweets.network$source %in% celebrities),]
-tweets.network <- tweets.network[!(tweets.network$source %in% media),]
-tweets.network <- tweets.network[!(tweets.network$target %in% movs),]
-tweets.network <- tweets.network[!(tweets.network$target %in% celebrities),]
-tweets.network <- tweets.network[!(tweets.network$target %in% media),]
+# tweets <- tweets[!(tweets$user %in% movs),]
+# tweets <- tweets[!(tweets$user %in% celebrities),]
+# tweets <- tweets[!(tweets$user %in% media),]
+# tweets.network <- tweets.network[!(tweets.network$source %in% movs),]
+# tweets.network <- tweets.network[!(tweets.network$source %in% celebrities),]
+# tweets.network <- tweets.network[!(tweets.network$source %in% media),]
+# tweets.network <- tweets.network[!(tweets.network$target %in% movs),]
+# tweets.network <- tweets.network[!(tweets.network$target %in% celebrities),]
+# tweets.network <- tweets.network[!(tweets.network$target %in% media),]
 
 # Reordenamos
 tweets$group <- "people"
@@ -77,22 +78,20 @@ for(i in grupos)
 }
 
 # Comparamos ambos grupos
-row <- c()
-row$type <- i
-row$n.users <- nrow(users.tweets)
 table <- c()
 
 # Agregamos las variables
-for(j in 2:ncol(users.tweets))
+for(j in 3:ncol(users.tweets))
 {
-  row2 <- c()
-  row2$md <- round(mean(users.tweets[,j]),2)
-  row2$sd <- round(sd(users.tweets[,j]),2)
-  row2 <- as.data.frame(row2)
-  colnames(row2) <- c(paste("md.",colnames(users.tweets)[j], sep=""), paste("sd.",colnames(users.tweets)[j], sep=""))
-  row <- cbind(row, row2)
+  row <- c()
+  row$md.leaders <- round(mean(users.tweets[(users.tweets$group == "leaders"),j]),2)
+  row$sd.leaders <- round(sd(users.tweets[(users.tweets$group == "leaders"),j]),2)
+  row$md.orgs <- round(mean(users.tweets[(users.tweets$group == "orgs"),j]),2)
+  row$sd.orgs <- round(sd(users.tweets[(users.tweets$group == "orgs"),j]),2)
+  row$cohen.d <- round(cohensD(users.tweets[(users.tweets$group == "leaders"),j], users.tweets[(users.tweets$group == "orgs"),j], method="unequal"),2)
+  row <- as.data.frame(row)
+  rownames(row) <- colnames(users.tweets)[j]
+  table <- rbind(table, row)
 }
-table <- rbind(table, row)
-
-rm(row, row2)
+rm(row)
 xtable(table)

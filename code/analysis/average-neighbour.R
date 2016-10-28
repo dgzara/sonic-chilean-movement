@@ -72,8 +72,8 @@ for(i in 2011:2013)
   }
   
   # Obtengo los parámetros del fit
-  m <- lm(log(y) ~ log(x), max_values)
-  eq <- paste("italic(y) == ",format(coef(m)[1], digits = 2)," ",b = format(coef(m)[2], digits = 2),"%.%italic(x)~','~~italic(r)^2~'='~",format(summary(m)$r.squared, digits = 2), sep="")
+  m <- lm(log(y) ~ log(x), max_values) 
+  eq <- paste("gamma~'='~",b = format(-coef(m)[2], digits = 2),"~','~~italic(r)^2~'='~",format(summary(m)$r.squared, digits = 2), sep="")
   
   # Conf
   if(i == 2013){xlab <- 100; ylab <- 100}else{xlab <- 200; ylab <- 200}
@@ -82,7 +82,7 @@ for(i in 2011:2013)
   a <- ggplot(max_values, aes(x=x, y=y)) + 
       #geom_point() + 
       geom_point(data = d, aes(x=x, y=y,color = z, shape = z, alpha = l)) +
-      stat_smooth(method="lm", formula = y ~ x, color="red", se=0, na.rm = TRUE, size=0.5) +
+      stat_smooth(method="lm", formula = y ~ x, color="red", se=0, na.rm = TRUE, size=1) +
       scale_size_continuous(range = c(1, 2)) +
       scale_alpha_continuous(range = c(0.1,1)) +
       scale_x_log10(limits=c(1, max(d$x))) + 
@@ -93,7 +93,7 @@ for(i in 2011:2013)
       ylab("Log Average Neighbor Degree") +
       annotation_logticks(base = 10) + ggtitle(i) +
       guides(size = FALSE, alpha = FALSE) + scale_fill_discrete("") +
-      annotate("text", x = xlab, y = ylab, label = as.character(as.expression(eq)), parse=TRUE, color="red", size = 3)
+      annotate("text", x = xlab, y = ylab, label = as.character(as.expression(eq)), parse=TRUE, color="red")
   
   #Asigno el grafico a una variable
   assign(paste("plot", i, sep = ""), a)

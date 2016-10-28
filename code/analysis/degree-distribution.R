@@ -70,7 +70,7 @@ for(i in 2011:2013)
   
   # Obtengo los parámetros del fit
   m <- lm(log(Freq) ~ log(degree), degree.people.df)
-  eq <- paste("italic(y) == ",format(coef(m)[1], digits = 3)," ",b = format(coef(m)[2], digits = 3),"%.%italic(x)~','~~italic(r)^2~'='~",format(summary(m)$r.squared, digits = 2), sep="")
+  eq <- paste("gamma~'='~",b = format(-coef(m)[2], digits = 3),"~','~~italic(r)^2~'='~",format(summary(m)$r.squared, digits = 2), sep="")
   
   # Creamos el grafico
   p1 <- ggplot(data = degree.people.df, aes(x=degree, y=Freq))+ geom_point(data = degree.people.df, aes(x=degree, y=Freq, color = "People", shape="People"), alpha = 0.8) 
