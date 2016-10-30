@@ -23,35 +23,20 @@ tweets$datetime <- as.POSIXct(tweets$datetime, format="%a %b %d %H:%M:%S %z %Y")
 # tweets <- tweets[!(tweets$target %in% celebrities),]
 # tweets <- tweets[!(tweets$target %in% media),]
 
-# Obtenemos los usuarios
-users.source <- sort(unique(unlist(tweets$source, use.names = FALSE)))
-users.target <- sort(unique(unlist(tweets$target, use.names = FALSE)))
-users <- c(users.source, users.target)
-users <- as.data.frame(sort(unique(unlist(users, use.names = FALSE))))
-colnames(users) <- c("username")
-rm(users.source, users.target)
+# Listado de hashtags
+hashtags <- sort(unique(unlist(tweets$hashtag, use.names = FALSE)))
 
 # Revisamos por año
 final <- c()
 users.metrics <- c()
 
-for(i in 2011:2013)
+for(i in hashtags)
 {
-  tweetsYear <- selectByDate(tweets, year = i)
-  tweetsYear <- tweetsYear[(tweetsYear$type == "retweet"),]
-  tweetsYear <- tweetsYear[,c("source","target")]
+  tweets.hashtag <- tweets[(tweets$hashtag == i),c("source","target")]
   
   # Generamos el grafo
-  network <- graph.data.frame(tweetsYear, directed=TRUE)
+  network <- graph.data.frame(tweets.hashtag, directed=TRUE)
   network <- simplify(network, remove.multiple = FALSE, remove.loops = TRUE)
-  
-  # Trabajamos con el componente más grande
-  cl <- clusters(network)
-  network <- induced.subgraph(network, which(cl$membership == which.max(cl$csize)))
-  
-  # Reducimos a k-core
-  coreness <- graph.coreness(network)
-  network <- induced.subgraph(network, which(coreness > 5))
   
   # Obtenemos la matriz de adjcaencia
   a <- as.matrix(get.adjacency(network))
@@ -78,20 +63,6 @@ for(i in 2011:2013)
   # Calculamos para los grupos
   leaders.metrics$username <- NULL
   orgs.metrics$username <- NULL
-  
-  # Generamos la tabla de medias
-  types.m <- c()
-  types.m <- rbind(types.m, colMeans(leaders.metrics))
-  types.m <- rbind(types.m, colMeans(orgs.metrics))
-  types.m <- as.data.frame(types.m)
-  rownames(types.m) <- c("leaders", "orgs")
-  
-  # Generamos la tabla de desviacion 
-  types.sd <- c()
-  types.sd <- rbind(types.sd, apply(leaders.metrics, 2, sd))
-  types.sd <- rbind(types.sd, apply(orgs.metrics, 2, sd))
-  types.sd <- as.data.frame(types.sd)
-  rownames(types.sd) <- c("leaders", "orgs")
   
   # Consolidamos en una tabla
   data <- c()
