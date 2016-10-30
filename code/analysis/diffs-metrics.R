@@ -105,6 +105,8 @@ for(i in 2011:2013)
   
   # Consolidamos en una tabla
   data <- c()
+  data.year <- c()
+  
   for(j in 1:ncol(leaders.metrics))
   {
     row <- c()

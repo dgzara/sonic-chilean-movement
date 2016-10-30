@@ -13,12 +13,12 @@ tweets$tweetid <- NULL
 tweets$datetime <- as.POSIXct(tweets$datetime, format="%a %b %d %H:%M:%S %z %Y") 
 
 # Solo dejamos a los líderes, organizaciones, y common-people
-tweets <- tweets[!(tweets$source %in% movs),]
-tweets <- tweets[!(tweets$source %in% celebrities),]
-tweets <- tweets[!(tweets$source %in% media),]
-tweets <- tweets[!(tweets$target %in% movs),]
-tweets <- tweets[!(tweets$target %in% celebrities),]
-tweets <- tweets[!(tweets$target %in% media),]
+#tweets <- tweets[!(tweets$source %in% movs),]
+#tweets <- tweets[!(tweets$source %in% celebrities),]
+#tweets <- tweets[!(tweets$source %in% media),]
+#tweets <- tweets[!(tweets$target %in% movs),]
+#tweets <- tweets[!(tweets$target %in% celebrities),]
+#tweets <- tweets[!(tweets$target %in% media),]
 
 # Revisamos por año
 networks <- c()
