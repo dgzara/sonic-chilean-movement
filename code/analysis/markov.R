@@ -9,6 +9,9 @@ source(file='../libraries.R')
 source(file='../dbConnect.R')
 source(file='../accountsList.R')
 
+# Configuro UTF-8
+dbSendQuery(mydb, "SET NAMES utf8")
+
 # Obtenemos los tweets dirigidos
 q <- paste('SELECT lower(source) as source, lower(target) as target, type, hashtag, datetime  
            FROM hashtags_network',sep="")
@@ -16,13 +19,23 @@ tweets <- dbGetQuery(mydb, q)
 tweets$tweetid <- NULL
 tweets$datetime <- as.POSIXct(tweets$datetime, format="%a %b %d %H:%M:%S %z %Y") 
 
+# Obtengo los mejores hashtags
+q <- paste('SELECT hashtag, COUNT(*) 
+           FROM hashtags_network
+           GROUP BY hashtag
+           ORDER BY COUNT(*) DESC',sep="")
+hashtags.ranking <- dbGetQuery(mydb, q)
+
+# Dejamos a los tweets de los 20 hasthags
+tweets <- tweets[c(tweets$hashtag %in% hashtags.ranking$hashtag[1:20]),]
+
 # Solo dejamos a los líderes, organizaciones, y common-people
-tweets <- tweets[!(tweets$source %in% movs),]
-tweets <- tweets[!(tweets$source %in% celebrities),]
-tweets <- tweets[!(tweets$source %in% media),]
-tweets <- tweets[!(tweets$target %in% movs),]
-tweets <- tweets[!(tweets$target %in% celebrities),]
-tweets <- tweets[!(tweets$target %in% media),]
+#tweets <- tweets[!(tweets$source %in% movs),]
+#tweets <- tweets[!(tweets$source %in% celebrities),]
+#tweets <- tweets[!(tweets$source %in% media),]
+#tweets <- tweets[!(tweets$target %in% movs),]
+#tweets <- tweets[!(tweets$target %in% celebrities),]
+#tweets <- tweets[!(tweets$target %in% media),]
 
 # Generamos la red
 network <- tweets[,c("source", "target", "type")]
@@ -78,6 +91,12 @@ total.mention <- dcast(total.mention, source~target, value.var="mention")
 rownames(total.mention) <- total.mention$source
 total.mention$source <- NULL
 
+# Convertimos a log10
+#total.retweet <- log(total.retweet)
+#total.reply <- log(total.reply)
+#total.mention <- log(total.mention)
+  
+# Calculamos las proporciones
 proportions.reply <- as.data.frame(t(total.reply))
 proportions.reply <- as.data.frame(lapply(proportions.reply, function(x) x/sum(x, na.rm=TRUE)))
 rownames(proportions.reply) <- colnames(proportions.reply) #columnas es la fuente, #filas es el objetivo
@@ -96,15 +115,23 @@ rownames(proportions.mention) <- colnames(proportions.mention) #columnas es la f
 proportions.mention <- as.data.frame(t(proportions.mention))
 rownames(proportions.mention) <- colnames(proportions.mention) #columnas es la fuente, #filas es el objetivo
 
-# Imprimimos en Latex
-xtable(100*proportions.mention)
-xtable(100*proportions.reply)
-xtable(100*proportions.retweet)
-
 # Plots
-transitionMatrix.mention <- data.matrix(t(proportions.mention))
-transitionMatrix.reply <- data.matrix(t(proportions.reply))
-transitionMatrix.retweet <- data.matrix(t(proportions.retweet))
+transitionMatrix.mention <- data.matrix(t(log10(total.mention)))
+transitionMatrix.reply <- data.matrix(t(log10(total.reply)))
+transitionMatrix.retweet <- data.matrix(t(log10(total.retweet)))
+
+# Agregamos el prefijo
+proportion.mention.string <- matrix(nrow = nrow(proportions.mention), ncol = ncol(proportions.mention), "")
+proportion.reply.string <- matrix(nrow = nrow(proportions.reply), ncol = ncol(proportions.reply), "")
+proportion.retweet.string <- matrix(nrow = nrow(proportions.retweet), ncol = ncol(proportions.retweet), "")
+
+for(i in 1:nrow(proportions.mention)){
+  for(j in 1:ncol(proportions.mention)){
+    proportion.mention.string[i,j] <- paste0(round(100*proportions.mention[i,j],2)," ",sep="")
+    proportion.reply.string[i,j] <- paste0(round(100*proportions.reply[i,j],2)," ",sep="")
+    proportion.retweet.string[i,j] <- paste0(round(100*proportions.retweet[i,j],2)," ",sep="")
+  }
+}
 
 # Creamos los usuarios
 users.source <- sort(unique(unlist(tweets$source, use.names = FALSE)))
@@ -122,40 +149,56 @@ numberUsers <- as.data.frame(numberUsers)
 numberUsers$group <- as.character(numberUsers$group)
 
 # MARKOV
-nodeSizes <- setNames(c(0.12,0.12,0.2), numberUsers$group)
-distances.x <- c(0.1, -0.12, 0.27)
-distances.y <- c(-0.12, -0.12, 0)
-  
+nodeSizes <- setNames(0.06*log10(numberUsers$number), numberUsers$group)
+distances.x <- c(0.15, -0.15, 0.36)
+distances.y <- c(-0.09, -0.09, 0)
+
 # Configuramos las curvas
-curves.reply <- matrix(nrow = nrow(transitionMatrix.reply), ncol = ncol(transitionMatrix.reply), 0.1)
-curves.mention <- matrix(nrow = nrow(transitionMatrix.mention), ncol = ncol(transitionMatrix.mention), 0.1)
-curves.retweet <- matrix(nrow = nrow(transitionMatrix.retweet), ncol = ncol(transitionMatrix.retweet), 0.1)
+curves.reply <- matrix(nrow = nrow(transitionMatrix.reply), ncol = ncol(transitionMatrix.reply), 0.05)
+curves.mention <- matrix(nrow = nrow(transitionMatrix.mention), ncol = ncol(transitionMatrix.mention), 0.05)
+curves.retweet <- matrix(nrow = nrow(transitionMatrix.retweet), ncol = ncol(transitionMatrix.retweet), 0.05)
+
+colors <- matrix(nrow = nrow(transitionMatrix.reply), ncol = ncol(transitionMatrix.reply), "black")
+colors[,1] <- "#24C467"
+colors[,2] <- "#8AB6FA"
+colors[,3] <- "#F87570"
+colors.nodes <- c("#24C467", "#8AB6FA", "#F87570")
+cex.text <- 0.8
+arr.lwd <- 0.07
+arr.length <- 0.07
+arr.width <- 0.07
+arr.pos <- matrix(nrow = nrow(transitionMatrix.reply), ncol = ncol(transitionMatrix.reply), 0.5)
+arr.pos[2,3] <- 0.60
+arr.pos[3,2] <- 0.45
+arr.pos[1,3] <- 0.60
+arr.pos[3,1] <- 0.45
+dtext <- 0.12
 
 #Plot final
 pdf("../../plots/markov.pdf",9,3)
 par(mfrow=c(1,3)) 
-p1 <- plotmat(100*round(transitionMatrix.reply, 2), curve = curves.reply,
-              name = colnames(transitionMatrix.reply), lwd = 1, box.lwd = 2,
-              cex.txt = 1, box.cex = 1, box.size = nodeSizes,
-              arr.lwd = 5*transitionMatrix.reply,
-              box.type = "ellipse", box.prop = 1, self.lwd = 5*diag(transitionMatrix.reply),
-              shadow.size = 0, self.cex = 0.4, my = -0.075, mx = -0.01,
-              relsize = 0.9, self.shiftx = distances.x,
-              self.shifty = distances.y, main = "a) Replies proportion (%)")
-p2 <- plotmat(100*round(transitionMatrix.retweet, 2), curve = curves.retweet,
+p1 <- plotmat(t(proportion.retweet.string), curve = curves.retweet,
               name = colnames(transitionMatrix.retweet), lwd = 1, box.lwd = 2,
-              cex.txt = 1, box.cex = 1, box.size = nodeSizes,
-              arr.lwd = 5*transitionMatrix.retweet,
-              box.type = "ellipse", box.prop = 1, self.lwd = 5*diag(transitionMatrix.retweet),
-              shadow.size = 0, self.cex = 0.4, my = -0.075, mx = -0.01,
-              relsize = 0.9, self.shiftx = distances.x,
-              self.shifty = distances.y, main = "b) Retweets proportion (%)")
-p3 <- plotmat(100*round(transitionMatrix.mention, 2), curve = curves.mention,
+              cex.txt = cex.text, box.cex = 1, box.size = nodeSizes,
+              arr.pos = arr.pos, arr.lwd = arr.lwd*transitionMatrix.retweet, arr.width = arr.width*transitionMatrix.retweet, arr.length = arr.length*transitionMatrix.retweet,
+              dtext = dtext, box.type = "ellipse", box.lcol = colors.nodes, box.col = colors.nodes, box.prop = 1, self.lwd = 0.05*diag(transitionMatrix.retweet),
+              shadow.size = 0, self.cex = 0.3, my = -0.15, mx = -0.01,
+              relsize = 0.85, self.shiftx = distances.x, 
+              arr.type = "triangle", self.shifty = distances.y, arr.col = colors, arr.lcol = colors, main = "a) Retweets proportion (%)")
+p2 <- plotmat(t(proportion.reply.string), curve = curves.reply,
+              name = colnames(transitionMatrix.reply), lwd = 1, box.lwd = 2,
+              cex.txt = cex.text, box.cex = 1, box.size = nodeSizes,
+              arr.pos = arr.pos, arr.lwd = arr.lwd*transitionMatrix.reply, arr.width = arr.width*transitionMatrix.reply, arr.length = arr.length*transitionMatrix.reply,
+              dtext = dtext, box.type = "ellipse", box.lcol = colors.nodes, box.col = colors.nodes, box.prop = 1, self.lwd = 0.05*diag(transitionMatrix.reply),
+              shadow.size = 0, self.cex = 0.3, my = -0.15, mx = -0.01,
+              relsize = 0.85, self.shiftx = distances.x,
+              arr.type = "triangle", self.shifty = distances.y, arr.col = colors, arr.lcol = colors, main = "b) Replies proportion (%)")
+p3 <- plotmat(t(proportion.mention.string), curve = curves.mention,
               name = colnames(transitionMatrix.mention), lwd = 1, box.lwd = 2,
-              cex.txt = 1, box.cex = 1, box.size = nodeSizes,
-              arr.lwd = 5*transitionMatrix.mention,
-              box.type = "ellipse", box.prop = 1, self.lwd = 5*diag(transitionMatrix.mention),
-              shadow.size = 0, self.cex = 0.4, my = -0.075, mx = -0.01,
-              relsize = 0.9, self.shiftx = distances.x,
-              self.shifty = distances.y, main = "c) Mentions proportion (%)")
+              cex.txt = cex.text, box.cex = 1, box.size = nodeSizes,
+              arr.pos = arr.pos, arr.lwd = arr.lwd*transitionMatrix.mention, arr.width = arr.width*transitionMatrix.mention, arr.length = arr.length*transitionMatrix.mention,
+              dtext = dtext, box.type = "ellipse", box.lcol = colors.nodes, box.col = colors.nodes, box.prop = 1, self.lwd = 0.05*diag(transitionMatrix.mention),
+              shadow.size = 0, self.cex = 0.3, my = -0.15, mx = -0.01,
+              relsize = 0.85, self.shiftx = distances.x,
+              arr.type = "triangle", self.shifty = distances.y, arr.col = colors, arr.lcol = colors, main = "c) Mentions proportion (%)")
 dev.off()

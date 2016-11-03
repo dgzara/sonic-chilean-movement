@@ -3,6 +3,7 @@ setwd(folder)
 source(file='../libraries.R')
 source(file='../dbConnect.R')
 source(file='../accountsList.R')
+library(xtable)
 
 # Configuro UTF-8
 dbSendQuery(mydb, "SET NAMES utf8")
@@ -14,13 +15,18 @@ tweets <- dbGetQuery(mydb, q)
 tweets$datetime <- as.POSIXct(tweets$datetime, format="%a %b %d %H:%M:%S %z %Y") 
 tweets <- tweets[-(tweets$datetime < "2011-01-01"),]
 
+# Obtengo los mejores hashtags
+q <- paste('SELECT hashtag, COUNT(*) 
+           FROM hashtags_network
+           GROUP BY hashtag
+           ORDER BY COUNT(*) DESC',sep="")
+hashtags.ranking <- dbGetQuery(mydb, q)
+
+# Dejamos a los tweets de los 20 hasthags
+tweets <- tweets[c(tweets$hashtag %in% hashtags.ranking$hashtag[1:20]),]
+
 # Listado de hashtags
 hashtags <- sort(unique(unlist(tweets$hashtag, use.names = FALSE)))
-
-# Solo dejamos a los líderes, organizaciones, y common-people
-#tweets <- tweets[!(tweets$user %in% movs),]
-#tweets <- tweets[!(tweets$user %in% celebrities),]
-#tweets <- tweets[!(tweets$user %in% media),]
 
 # Calculamos las métricas
 table <- c()
@@ -55,3 +61,13 @@ table.summary$tweets.max <- max(table$n.tweets)
 table.summary$total <- nrow(tweets)
 table.summary <- as.data.frame(table.summary)
 xtable(table.summary)
+
+# Obtengo la red
+q <- paste('SELECT hashtag, lower(source) as source, lower(target) as target, type  
+           FROM hashtags_network',sep="")
+tweets.network <- dbGetQuery(mydb, q)
+
+# Dejamos a los tweets de los 20 hasthags
+tweets.network <- tweets.network[c(tweets.network$hashtag %in% hashtags.ranking$hashtag[1:20]),]
+nrow(tweets.network)
+nrow(tweets.network[(tweets.network$type == "retweet"),])
