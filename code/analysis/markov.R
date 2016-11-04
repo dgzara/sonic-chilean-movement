@@ -91,6 +91,12 @@ total.mention <- dcast(total.mention, source~target, value.var="mention")
 rownames(total.mention) <- total.mention$source
 total.mention$source <- NULL
 
+
+# Imprimimos en Latex
+xtable(total.mention)
+xtable(total.retweet)
+xtable(total.reply)
+
 # Convertimos a log10
 #total.retweet <- log(total.retweet)
 #total.reply <- log(total.reply)
@@ -159,10 +165,10 @@ curves.mention <- matrix(nrow = nrow(transitionMatrix.mention), ncol = ncol(tran
 curves.retweet <- matrix(nrow = nrow(transitionMatrix.retweet), ncol = ncol(transitionMatrix.retweet), 0.05)
 
 colors <- matrix(nrow = nrow(transitionMatrix.reply), ncol = ncol(transitionMatrix.reply), "black")
-colors[,1] <- "#24C467"
-colors[,2] <- "#8AB6FA"
+colors[,1] <- "#8AB6FA"
+colors[,2] <- "#24C467"
 colors[,3] <- "#F87570"
-colors.nodes <- c("#24C467", "#8AB6FA", "#F87570")
+colors.nodes <- c("#8AB6FA", "#24C467", "#F87570")
 cex.text <- 0.8
 arr.lwd <- 0.07
 arr.length <- 0.07

@@ -3,6 +3,7 @@ setwd(folder)
 source(file='../libraries.R')
 source(file='../dbConnect.R')
 source(file='../accountsList.R')
+source(file='functions.R')
 library(MASS)
 
 # Configuro UTF-8
@@ -84,7 +85,7 @@ m <- lm(log(y) ~ log(x), max_values)
 eq <- paste("gamma~'='~",b = format(-coef(m)[2], digits = 2),"~','~~italic(r)^2~'='~",format(summary(m)$r.squared, digits = 2), sep="")
 
 # Construyo el grafico
-a <- ggplot(max_values, aes(x=x, y=y)) + 
+p1 <- ggplot(max_values, aes(x=x, y=y)) + 
     #geom_point() + 
     geom_point(data = d, aes(x=x, y=y,color = z, shape = z, alpha = l)) +
     stat_smooth(method="lm", formula = y ~ x, color="red", se=0, na.rm = TRUE, size=1) +
@@ -93,7 +94,7 @@ a <- ggplot(max_values, aes(x=x, y=y)) +
     scale_x_log10(limits=c(1, max(d$x))) + 
     scale_y_log10(limits=c(1, max(d$y))) +
     theme_bw() +
-    theme(legend.position= "bottom",legend.title=element_blank(), panel.grid.minor = element_line(color="grey", linetype="dotted"), panel.grid.major = element_line(color="grey", linetype="dotted")) +
+    theme(legend.justification=c(1,1), legend.position=c(1,1),legend.title=element_blank(), panel.grid.minor = element_line(color="grey", linetype="dotted"), panel.grid.major = element_line(color="grey", linetype="dotted")) +
     xlab("Log Vertex Indegree") +
     ylab("Log Average Neighbor Degree") +
     annotation_logticks(base = 10) + 
@@ -102,7 +103,7 @@ a <- ggplot(max_values, aes(x=x, y=y)) +
 
 #Plot final
 pdf("../../plots/neighbor_total.pdf",6,5)
-a
+p1
 dev.off()
 
 # Resumen
@@ -112,14 +113,32 @@ a.nn.deg.network.orgs <- a.nn.deg.network[names(a.nn.deg.network)%in%orgs]
 # Comprobamos
 wilcox.test(a.nn.deg.network.leaders, a.nn.deg.network.orgs)$p.value
 
-# Dibujamos el plot
-data <- as.data.frame(rbind(cbind(a.nn.deg.network.leaders, "leader"), cbind(a.nn.deg.network.orgs, "org")))
-colnames(data) <- c("value", "group")
-data$value <- as.numeric(as.character(data$value))
+ggplot(density(a.nn.deg.network.orgs))
 
-p <- ggplot(data, aes(factor(group), value, fill=factor(group))) +
-  geom_violin() + geom_boxplot(width=0.1, fill="white") + 
-  xlab("Groups") + 
-  scale_y_log10() +
-  theme(legend.position="bottom")
-p
+# Generamos la matriz
+d1 <- data.frame(density(a.nn.deg.network.leaders)$x, density(a.nn.deg.network.leaders)$y, "Leaders")
+d2 <- data.frame(density(a.nn.deg.network.orgs)$x, density(a.nn.deg.network.orgs)$y, "Organizations")
+colnames(d1) <- colnames(d2) <- c("x", "y", "group")
+distribuciones <- rbind.data.frame(d1,d2)
+
+p2 <- ggplot(distribuciones, aes(x=x,y=y,colour = group)) + 
+  geom_line() + theme_bw() +
+  theme(legend.justification=c(1,1), legend.position=c(1,1), legend.title=element_blank(), panel.grid.minor = element_line(color="grey", linetype="dotted"), panel.grid.major = element_line(color="grey", linetype="dotted")) +
+  xlab("Log Average Neighbor Degree") +
+  ylab("Density") + 
+  scale_x_log10() +
+  scale_color_manual(values=c("#24C467", "#8AB6FA"))
+
+# Plot distribution
+pdf("../../plots/distribution_neighbor.pdf",6,5)
+p2
+dev.off()
+
+# Tablas
+summary(a.nn.deg.network.leaders)
+summary(a.nn.deg.network.orgs)
+
+# Combinado
+pdf("../../plots/neighbor.pdf",10,4.5)
+multiplot(p1, p2, cols=2)
+dev.off()
