@@ -72,14 +72,6 @@ tweets <- dbGetQuery(mydb, q)
 tweets$tweetid <- NULL
 tweets$datetime <- as.POSIXct(tweets$datetime, format="%a %b %d %H:%M:%S %z %Y") 
 
-# Solo dejamos a los líderes, organizaciones, y common-people
-tweets <- tweets[!(tweets$source %in% movs),]
-tweets <- tweets[!(tweets$source %in% celebrities),]
-tweets <- tweets[!(tweets$source %in% media),]
-tweets <- tweets[!(tweets$target %in% movs),]
-tweets <- tweets[!(tweets$target %in% celebrities),]
-tweets <- tweets[!(tweets$target %in% media),]
-
 # Seleccionamos un hashtag de ejemplo, en la cadena de retweets
 data <- tweets[(tweets$type != "retweet"),]
 data[,c("type", "hashtag")] <- NULL
@@ -98,15 +90,15 @@ V(g)[V(g)$name %in% leaders]$type <- 1
 V(g)[V(g)$name %in% orgs]$type <- 2
 
 # Obtengo las mejores 10 organizaciones y 10 líderes
-top.leaders <- rev(sort(degree(g, mode="in")[V(g)$name %in%leaders]))[1:5]
-top.orgs <- rev(sort(degree(g, mode="in")[V(g)$name %in%orgs]))[1:5]
+top.leaders <- rev(sort(degree(g)[V(g)$name %in%leaders]))
+top.orgs <- rev(sort(degree(g)[V(g)$name %in%orgs]))
 
 # Generamos de nuevo la red
-g <- induced.subgraph(g, which(V(g)$type==0 | V(g)$name %in% names(top.leaders) | V(g)$name %in% names(top.orgs)))
+g <- induced.subgraph(g, which(V(g)$type==0 | V(g)$name %in% names(top.leaders[top.leaders > 15])  | V(g)$name %in% names(top.orgs[top.orgs > 14])))
 
 # Creamos los k-cores
 coreness <- graph.coreness(g)
-g <- induced.subgraph(g, which(coreness > 5))
+g <- induced.subgraph(g, which(coreness > 20 | V(g)$type == 1 | V(g)$type == 2))
 
 # Generamos los clusters
 cluster <- cluster_walktrap(g)
@@ -124,9 +116,18 @@ g.orgs <- induced.subgraph(g, which(cluster$membership %in% com.orgs & V(g)$type
 plot(g.leaders, vertex.color=V(g.leaders)$type)
 plot(g.orgs, vertex.color=V(g.orgs)$type)
 
+################################
+####
+## REM
+####
+################################
+
+g.leaders.sample <- induced.subgraph(g.leaders, which(V(g.leaders) %in% sample(V(g.leaders), 100)))
+g.orgs.sample <- induced.subgraph(g.orgs, which(V(g.orgs) %in% sample(V(g.orgs), 100)))
+  
 # Generamos la lista de edges
-data.leaders <- data.frame(E(g.leaders)$timestamp, get.edgelist(g.leaders)[,1], get.edgelist(g.leaders)[,2], stringsAsFactors=FALSE)
-data.orgs <- data.frame(E(g.orgs)$timestamp, get.edgelist(g.orgs)[,1], get.edgelist(g.orgs)[,2], stringsAsFactors=FALSE)
+data.leaders <- data.frame(E(g.leaders.sample)$timestamp, get.edgelist(g.leaders.sample)[,1], get.edgelist(g.leaders.sample)[,2], stringsAsFactors=FALSE)
+data.orgs <- data.frame(E(g.orgs.sample)$timestamp, get.edgelist(g.orgs.sample)[,1], get.edgelist(g.orgs.sample)[,2], stringsAsFactors=FALSE)
 colnames(data.leaders) <- colnames(data.orgs) <- c("StartTime", "FromId", "ToId") 
 
 # Formateamos la data
@@ -142,9 +143,9 @@ data.orgs <- format_data(data.orgs)
 # Creamos la primera red
 network.leaders <- as.sociomatrix.eventlist(data.leaders[[1]], nrow(data.leaders[[2]]))
 gplot(network.leaders, vertex.col=4-2*data.leaders[[2]]$type, vertex.cex=2, edge.lwd=network.leaders^0.75)
+intercept.leaders <- rep(1, nrow(data.leaders[[2]])) 
 
 # 1st model: intercept model, containing only a vector of 1s (ClassIntercept) 
-intercept.leaders <- rep(1, nrow(data.leaders[[2]])) 
 classfit.leaders.1 <- rem.dyad(data.leaders[[1]], n=nrow(data.leaders[[2]]), effects=c("CovSnd"), covar=list(CovSnd=intercept.leaders), ordinal=FALSE, hessian=TRUE)
 summary(classfit.leaders.1)
 
@@ -181,9 +182,9 @@ mean(apply(classfit.leaders.2$predicted.match,1,any))
 # Creamos la segunda red
 network.orgs <- as.sociomatrix.eventlist(data.orgs[[1]], nrow(data.orgs[[2]]))
 gplot(network.orgs, vertex.col=4-2*data.orgs[[2]]$type, vertex.cex=2, edge.lwd=network.orgs^0.75)
+intercept.orgs <- rep(1, nrow(data.orgs[[2]])) 
 
 # 1st model: intercept model, containing only a vector of 1s (ClassIntercept) 
-intercept.orgs <- rep(1, nrow(data.orgs[[2]])) 
 classfit.orgs.1 <- rem.dyad(data.orgs[[1]], n=nrow(data.orgs[[2]]), effects=c("CovSnd"), covar=list(CovSnd=intercept.orgs), ordinal=FALSE, hessian=TRUE)
 summary(classfit.orgs.1)
 
