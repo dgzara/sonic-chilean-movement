@@ -5,6 +5,7 @@ source(file='../dbConnect.R')
 source(file='../accountsList.R')
 library(xtable)
 library(lsr)
+library(sna)
 
 # Configuro UTF-8
 dbSendQuery(mydb, "SET NAMES utf8")
@@ -15,93 +16,102 @@ q <- paste('SELECT lower(source) as source, lower(target) as target, type, hasht
 tweets <- dbGetQuery(mydb, q)
 tweets$datetime <- as.POSIXct(tweets$datetime, format="%a %b %d %H:%M:%S %z %Y") 
 
-# Solo dejamos a los líderes, organizaciones, y common-people
-# tweets <- tweets[!(tweets$source %in% movs),]
-# tweets <- tweets[!(tweets$source %in% celebrities),]
-# tweets <- tweets[!(tweets$source %in% media),]
-# tweets <- tweets[!(tweets$target %in% movs),]
-# tweets <- tweets[!(tweets$target %in% celebrities),]
-# tweets <- tweets[!(tweets$target %in% media),]
+# Obtengo los mejores hashtags
+q <- paste('SELECT hashtag, COUNT(*) 
+           FROM hashtags_network
+           GROUP BY hashtag
+           ORDER BY COUNT(*) DESC',sep="")
+hashtags.ranking <- dbGetQuery(mydb, q)
 
 # Listado de hashtags
 hashtags <- sort(unique(unlist(tweets$hashtag, use.names = FALSE)))
 
 # Revisamos por año
-final <- c()
+table <- c()
 users.metrics <- c()
 
-for(i in hashtags)
+# Analizamos por hashtags
+for(k in c("retweet", "reply", "mention"))
 {
-  tweets.hashtag <- tweets[(tweets$hashtag == i),c("source","target")]
+  leaders.metrics <- c()
+  orgs.metrics <- c()
   
-  # Generamos el grafo
-  network <- graph.data.frame(tweets.hashtag, directed=TRUE)
-  network <- simplify(network, remove.multiple = FALSE, remove.loops = TRUE)
-  
-  # Obtenemos la matriz de adjcaencia
-  a <- as.matrix(get.adjacency(network))
-  V(network)$type <- "people"
-  V(network)[V(network)$name %in% leaders]$type <- "leader"
-  V(network)[V(network)$name %in% orgs]$type <- "organization"
-  
-  # Calculamos las metricas por usuarios
-  brokerage <- brokerage(a, V(network)$type)$raw.nli
-  
-  # Calculamos los valores
-  username <- rownames(indegree) 
-  brokerage <- brokerage[,1]
-  
-  # Armamos la tabla
-  users.metrics <- cbind.data.frame(username, brokerage)
-  users.metrics <- as.data.frame(users.metrics)
-  users.metrics[is.na(users.metrics)] <- 0   
-  
-  # Calculamos los valores descriptivos por grupos
-  leaders.metrics <- na.omit(users.metrics[(users.metrics$username %in% leaders),])
-  orgs.metrics <- na.omit(users.metrics[(users.metrics$username %in% orgs),])
+  for(i in hashtags.ranking[1:20,]$hashtag)
+  {
+    # Generamos el grafo
+    g <- graph.data.frame(tweets[(tweets$hashtag == i & tweets$type == k),c("source","target")], directed=TRUE)
+    g <- simplify(g, remove.multiple = FALSE, remove.loops = TRUE)
+    
+    # Obtenemos la matriz de adjcaencia
+    a <- as.matrix(get.adjacency(g))
+    V(g)$type <- "people"
+    V(g)[V(g)$name %in% leaders]$type <- "leader"
+    V(g)[V(g)$name %in% orgs]$type <- "organization"
+    
+    # Calculamos las metricas por usuarios
+    brokerage <- brokerage(a, V(g)$type)$raw.nli
+    #brokerage.exp.nli <- brokerage(a, V(g)$type)$exp.nli
+    #brokerage.z.nli <- brokerage(a, V(g)$type)$z.nli
+    
+    # Calculamos los valores
+    username <- rownames(brokerage) 
+    
+    # Armamos la tabla
+    users.metrics <- cbind.data.frame(username, i, brokerage, stringsAsFactors=FALSE)
+    
+    # Calculamos los valores descriptivos por grupos
+    leaders.metrics <- rbind(leaders.metrics, users.metrics[(users.metrics$username %in% leaders),])
+    orgs.metrics <- rbind(orgs.metrics, users.metrics[(users.metrics$username %in% orgs),])
+  }
   
   # Calculamos para los grupos
   leaders.metrics$username <- NULL
   orgs.metrics$username <- NULL
+  leaders.metrics$i <- NULL
+  orgs.metrics$i <- NULL
   
-  # Consolidamos en una tabla
-  data <- c()
+  final <- c()
   for(j in 1:ncol(leaders.metrics))
   {
     row <- c()
-    row$leaders.m <- types.m[1,j]
-    row$leaders.sd <- types.sd[1,j]
-    row$orgs.m <- types.m[2,j]
-    row$orgs.sd <- types.sd[2,j]
-    row$p.wilcox <- wilcox.test(leaders.metrics[,j], orgs.metrics[,j], exact = FALSE, correct = TRUE)$p.value
-    row$cohen.d <- cohensD(leaders.metrics[,j], orgs.metrics[,j], method="unequal")
-    
-    # Normalizamos la daa
-    new.data <- as.data.frame(rbind(cbind(leaders.metrics[,j], "leader"), cbind(orgs.metrics[,j], "org")))
-    new.data[,1] <- as.numeric(new.data[,1])
-    new.data[,1] <- (new.data[,1] - min(new.data[,1])) / (max(new.data[,1]) - min(new.data[,1]))
-    colnames(new.data) <- c("value", "group")
-    
-    # Test t-student
-    tryCatch({
-      row$p.welch <- t.test(leaders.metrics[,j], orgs.metrics[,j],  alternative="two.sided", var.equal=FALSE)$p.value
-      # If n < 60, do not apply this test.
-    }, error = function(err) {
-      row$p.welch <- 0
-    })
+    row$metric <- colnames(leaders.metrics)[j]
+    row$leaders.m <- round(mean(leaders.metrics[,j], na.rm=TRUE),3)
+    row$leaders.sd <- round(sd(leaders.metrics[,j], na.rm=TRUE),3)
+    row$orgs.m <- round(mean(orgs.metrics[,j], na.rm=TRUE),3)
+    row$orgs.sd <- round(sd(orgs.metrics[,j], na.rm=TRUE),3)
+    row$p.wilcox <- wilcox.test(leaders.metrics[,j], orgs.metrics[,j], na.rm=TRUE)$p.value
     
     # Juntamos las filas
     row <- as.data.frame(row)
-    rownames(row) <- colnames(leaders.metrics)[j]
     final <- rbind(final, row)
-    
-    # Juntamos
-    data <- rbind(data, cbind(new.data, colnames(leaders.metrics)[j]))
   }
   
-  # Cerramos
-  rm(users.metrics, types.m, types.sd, row, tweetsYear, data, new.data)
+  if(is.null(table)){ 
+    table <- final
+  }else{
+    final$metric <- NULL
+    table <- cbind(table, final)
+  }
+  
+  rm(final, leaders.metrics, orgs.metrics) 
 }
 
-# Guardamos la tabla
-xtable(final, digits = 3, align="|l|r|r|r|r|r|", display=c("s", "e", "e", "e", "e", "f"), auto = TRUE)
+final <- matrix(0, nrow = nrow(table), ncol = 6)
+final <- as.data.frame(final)
+rownames(final) <- table$metric
+colnames(final) <- c("RT leaders", "RT orgs", "Reply leaders", "Reply orgs", "Mention leaders", "Mention orgs")
+indexs <- c(2,4,7,9,12,14)
+
+for(i in 1:nrow(final))
+{
+  for(j in 1:ncol(final))
+  {
+    if(i%%2 == 0){
+      final[i,j] <- paste(round(table[i,indexs[j]],3)," (",round(table[i,1+indexs[j]],2), ")", sep="")
+    } else {
+      final[i,j] <- paste(round(table[i,indexs[j]],3)," (",round(table[i,1+indexs[j]],2), ")", sep="")
+    }
+  }
+}
+
+xtable(final)

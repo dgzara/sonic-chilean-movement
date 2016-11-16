@@ -27,7 +27,6 @@ hashtags <- sort(unique(unlist(tweets$hashtag, use.names = FALSE)))
 
 # Revisamos por año
 table <- c()
-table.100 <- c()
 
 # Analizamos por hashtags
 for(k in c("retweet", "reply", "mention"))
@@ -38,27 +37,29 @@ for(k in c("retweet", "reply", "mention"))
   for(i in hashtags.ranking[1:20,]$hashtag)
   {
     # Generamos el grafo
-    network <- graph.data.frame(tweets[(tweets$hashtag == i & tweets$type == k),c("source","target")], directed=TRUE)
-    network <- simplify(network, remove.multiple = FALSE, remove.loops = TRUE)
+    g <- graph.data.frame(tweets[(tweets$hashtag == i & tweets$type == k),c("source","target")], directed=TRUE)
+    g <- simplify(g, remove.multiple = FALSE, remove.loops = TRUE)
     
     # Trabajamos con el componente más grande
-    #cl <- cluster_walktrap(network)
-    #network <- induced.subgraph(network, which(cl$membership == which.max(cl$csize)))
+    #cl <- cluster_walktrap(g)
+    #g <- induced.subgraph(g, which(cl$membership == which.max(cl$csize)))
     
     # Creamos los k-cores
-    #coreness <- graph.coreness(network)
-    #network <- induced.subgraph(network, which(coreness > 3))
+    #coreness <- graph.coreness(g)
+    #g <- induced.subgraph(g, which(coreness > 3))
     
     # Calculamos las metricas por usuarios
-    degree <- as.data.frame(degree(network))
-    indegree <- as.data.frame(degree(network,mode="in"))
-    outdegree <- as.data.frame(degree(network,mode="out"))
-    hub <- as.data.frame(hub_score(network)$vector)
-    authority <- as.data.frame(authority_score(network)$vector)
-    page.rank <- as.data.frame(page.rank(network)$vector)
-    betweenness <- betweenness(network, normalized=TRUE)
-    closeness <- closeness(network)
-    eigenvector <- eigen_centrality(network)$vector
+    degree <- as.data.frame(degree(g))
+    indegree <- as.data.frame(degree(g,mode="in"))
+    outdegree <- as.data.frame(degree(g,mode="out"))
+    hub <- as.data.frame(hub_score(g)$vector)
+    authority <- as.data.frame(authority_score(g)$vector)
+    page.rank <- as.data.frame(page.rank(g)$vector)
+    betweenness <- betweenness(g, normalized=TRUE)
+    closeness <- closeness(g)
+    eigenvector <- eigen_centrality(g)$vector
+    clustering <- transitivity(g, type="local", isolates="NA")
+    constraint <- constraint(g)
     
     # Calculamos los valores
     username <- rownames(indegree)   
@@ -70,13 +71,13 @@ for(k in c("retweet", "reply", "mention"))
     page.rank <- page.rank[,1]
     
     # Armamos la tabla
-    users.metrics <- cbind.data.frame(username, i, degree, indegree, outdegree, hub, authority, page.rank, betweenness, closeness, eigenvector)
+    users.metrics <- cbind.data.frame(username, i, degree, indegree, outdegree, hub, authority, page.rank, betweenness, closeness, eigenvector, clustering, constraint)
     users.metrics <- as.data.frame(users.metrics)
-    users.metrics[is.na(users.metrics)] <- 0   
+    #users.metrics[is.na(users.metrics)] <- 0   
     
     # Calculamos los valores descriptivos por grupos
-    leaders.metrics <- rbind(leaders.metrics, na.omit(users.metrics[(users.metrics$username %in% leaders),]))
-    orgs.metrics <- rbind(orgs.metrics, na.omit(users.metrics[(users.metrics$username %in% orgs),]))
+    leaders.metrics <- rbind(leaders.metrics, users.metrics[(users.metrics$username %in% leaders),])
+    orgs.metrics <- rbind(orgs.metrics, users.metrics[(users.metrics$username %in% orgs),])
   }
   
   # Calculamos para los grupos
@@ -90,11 +91,11 @@ for(k in c("retweet", "reply", "mention"))
   {
     row <- c()
     row$metric <- colnames(leaders.metrics)[j]
-    row$leaders.m <- round(mean(leaders.metrics[,j]),3)
-    row$leaders.sd <- round(sd(leaders.metrics[,j]),3)
-    row$orgs.m <- round(mean(orgs.metrics[,j]),3)
-    row$orgs.sd <- round(sd(orgs.metrics[,j]),3)
-    row$p.wilcox <- wilcox.test(leaders.metrics[,j], orgs.metrics[,j])$p.value
+    row$leaders.m <- round(mean(leaders.metrics[,j], na.rm=TRUE),3)
+    row$leaders.sd <- round(sd(leaders.metrics[,j], na.rm=TRUE),3)
+    row$orgs.m <- round(mean(orgs.metrics[,j], na.rm=TRUE),3)
+    row$orgs.sd <- round(sd(orgs.metrics[,j], na.rm=TRUE),3)
+    row$p.wilcox <- wilcox.test(leaders.metrics[,j], orgs.metrics[,j], na.rm=TRUE)$p.value
     
     # Juntamos las filas
     row <- as.data.frame(row)
@@ -108,34 +109,7 @@ for(k in c("retweet", "reply", "mention"))
     table <- cbind(table, final)
   }
   
-  # Revisamos a los mejores
-  top.leaders <- leaders.metrics[order(-leaders.metrics$degree),][1:100,]
-  top.orgs <- orgs.metrics[order(-orgs.metrics$degree),][1:100,]
-  
-  final.100 <- c()
-  for(j in 1:ncol(leaders.metrics))
-  {
-    row <- c()
-    row$metric <- colnames(top.leaders)[j]
-    row$leaders.m <- round(mean(top.leaders[,j]),3)
-    row$leaders.sd <- round(sd(top.leaders[,j]),3)
-    row$orgs.m <- round(mean(top.orgs[,j]),3)
-    row$orgs.sd <- round(sd(top.orgs[,j]),3)
-    row$p.wilcox <- round(wilcox.test(top.leaders[,j], top.orgs[,j])$p.value,3)
-    
-    # Juntamos las filas
-    row <- as.data.frame(row)
-    final.100 <- rbind(final.100, row)
-  }
-  
-  if(is.null(table.100)){ 
-    table.100 <- final.100
-  }else{
-    final.100$metric <- NULL
-    table.100 <- cbind(table.100, final.100)
-  }
-  
-  rm(final, final.100, leaders.metrics, orgs.metrics)
+  rm(final, leaders.metrics, orgs.metrics)
 }
 
 final <- matrix(0, nrow = nrow(table), ncol = 6)

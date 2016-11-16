@@ -42,14 +42,11 @@ network <- tweets[,c("source", "target", "type")]
 network$source_group <- "People"
 network$target_group <- "People"
 
-for(i in 1:nrow(network))
-{
-  if(network[i,]$source %in% orgs) { network[i,]$source_group <- "Orgs" 
-  } else if(network[i,]$source %in% leaders) { network[i,]$source_group <- "Leaders" }
-  
-  if(network[i,]$target %in% orgs){ network[i,]$target_group <- "Orgs" 
-  } else if(network[i,]$target %in% leaders) { network[i,]$target_group <- "Leaders"}
-}
+# Seteamos los grupos
+network[(network$source %in% leaders),]$source_group <- "Leaders"
+network[(network$source %in% orgs),]$source_group <- "Orgs"
+network[(network$target %in% leaders),]$target_group <- "Leaders"
+network[(network$target %in% orgs),]$target_group <- "Orgs"
 
 # Calculamos las probabilidades
 proportions <- c()
