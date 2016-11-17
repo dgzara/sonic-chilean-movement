@@ -1,6 +1,7 @@
 folder <- paste0(getwd(),"/code/analysis")
 setwd(folder)
 library(stats)
+library(reshape2)
 source(file='../libraries.R')
 source(file='../dbConnect.R')
 source(file='../accountsList.R')
@@ -27,6 +28,10 @@ network[(network$target %in% orgs),]$target_group <- "Orgs"
 
 # Revisamos por año
 table <- c()
+table.reply <- c()
+table.mention <- c()
+table.retweet <- c()
+
 for(i in c("People", "Orgs", "Leaders"))
 {
   row <- c()
@@ -36,7 +41,21 @@ for(i in c("People", "Orgs", "Leaders"))
   row <- as.data.frame(row)
   rownames(row) <- i
   table <- rbind(table, row)
+  
+  for(j in c("People", "Orgs", "Leaders"))
+  {
+    table.reply <- rbind(table.reply, data.frame(i, j, nrow(network[(network$source_group == i & network$target_group == j & network$type == "reply"), ]), stringsAsFactors = FALSE))
+    table.mention <- rbind(table.mention, data.frame(i, j, nrow(network[(network$source_group == i & network$target_group == j & network$type == "mention"), ]), stringsAsFactors = FALSE))
+    table.retweet <- rbind(table.retweet, data.frame(i, j, nrow(network[(network$source_group == i & network$target_group == j & network$type == "retweet"), ]), stringsAsFactors = FALSE))
+  }
 }
+
+colnames(table.reply) <- colnames(table.mention) <- colnames(table.retweet) <- c("source", "target", "value")
+table.reply <- dcast(table.reply, source~target)
+table.mention <- dcast(table.mention, source~target)
+table.retweet <- dcast(table.retweet, source~target)
+table.reply$source <- table.retweet$source <- table.mention$source <- NULL
+rownames(table.reply) <- rownames(table.mention) <- rownames(table.retweet) <- c("Leaders", "Orgs", "People")
 
 # Pearson's Chi-squared test
 Xsq <- chisq.test(table)
@@ -57,3 +76,29 @@ Xsq2$expected   # expected counts under the null
 Xsq2$residuals  # Pearson residuals
 Xsq2$stdres     # standardized residuals
 
+# Pearson's Chi-squared test
+Xsq.retweet <- chisq.test(table.retweet)
+print(Xsq.retweet)
+Xsq.retweet$observed   # observed counts (same as M)
+Xsq.retweet$expected   # expected counts under the null
+Xsq.retweet$residuals  # Pearson residuals
+Xsq.retweet$stdres     # standardized residuals
+Xsq.retweet$observed - Xsq.retweet$expected
+
+# Pearson's Chi-squared test
+Xsq.reply <- chisq.test(table.reply)
+print(Xsq.reply)
+Xsq.reply$observed   # observed counts (same as M)
+Xsq.reply$expected   # expected counts under the null
+Xsq.reply$residuals  # Pearson residuals
+Xsq.reply$stdres     # standardized residuals
+Xsq.reply$observed - Xsq.reply$expected
+
+# Pearson's Chi-squared test
+Xsq.mention <- chisq.test(table.mention)
+print(Xsq.mention)
+Xsq.mention$observed   # observed counts (same as M)
+Xsq.mention$expected   # expected counts under the null
+Xsq.mention$residuals  # Pearson residuals
+Xsq.mention$stdres     # standardized residuals
+Xsq.mention$observed - Xsq.mention$expected

@@ -23,14 +23,6 @@ q <- paste('SELECT hashtag, COUNT(*)
            ORDER BY COUNT(*) DESC',sep="")
 hashtags.ranking <- dbGetQuery(mydb, q)
 
-# Solo dejamos a los líderes, organizaciones, y common-people
-#tweets <- tweets[!(tweets$source %in% movs),]
-#tweets <- tweets[!(tweets$source %in% celebrities),]
-#tweets <- tweets[!(tweets$source %in% media),]
-#tweets <- tweets[!(tweets$target %in% movs),]
-#tweets <- tweets[!(tweets$target %in% celebrities),]
-#tweets <- tweets[!(tweets$target %in% media),]
-
 # Dejamos a los tweets de los 20 hasthags
 tweets <- tweets[c(tweets$hashtag %in% hashtags.ranking$hashtag[1:20]),]
 
@@ -55,9 +47,12 @@ V(network)[V(network)$name %in% orgs]$size <- 2
 V(network)[V(network)$name %in% leaders]$alpha <- 1
 V(network)[V(network)$name %in% orgs]$alpha <- 1
 
-# Average neighbor degree versus vertex degree (log–log scale)
+# Average neighbor indegree versus vertex indegree (log–log scale)
 network.simplified <- simplify(network)
-a.nn.deg.network <- graph.knn(network.simplified,V(network.simplified))$knn 
+a <- adjacent_vertices(network.simplified, V(network.simplified), mode = c("out"))
+a.nn.deg.network <- lapply(a, function(x){
+  mean(degree(network.simplified, V(network.simplified)[V(network.simplified) %in% x[]], mode="in"))
+})
 d.network.simplified <- degree(network.simplified, mode="in")
 
 # Genero los datos
@@ -96,7 +91,7 @@ p1 <- ggplot(max_values, aes(x=x, y=y)) +
     theme_bw() +
     theme(legend.justification=c(1,1), legend.position=c(1,1),legend.title=element_blank(), panel.grid.minor = element_line(color="grey", linetype="dotted"), panel.grid.major = element_line(color="grey", linetype="dotted")) +
     xlab("Log Vertex Indegree") +
-    ylab("Log Average Neighbor Degree") +
+    ylab("Log Average Neighbor Indegree") +
     annotation_logticks(base = 10) + 
     guides(size = FALSE, alpha = FALSE) + scale_fill_discrete("")
     #annotate("text", x = 250, y = 250, label = as.character(as.expression(eq)), parse=TRUE, color="red")
@@ -107,13 +102,14 @@ p1
 dev.off()
 
 # Resumen
-a.nn.deg.network.leaders <- a.nn.deg.network[names(a.nn.deg.network)%in%leaders]
-a.nn.deg.network.orgs <- a.nn.deg.network[names(a.nn.deg.network)%in%orgs]
+a.nn.deg.network.leaders <- na.omit(unlist(a.nn.deg.network[names(a.nn.deg.network)%in%leaders]))
+a.nn.deg.network.orgs <- na.omit(unlist(a.nn.deg.network[names(a.nn.deg.network)%in%orgs]))
 
 # Comprobamos
-wilcox.test(a.nn.deg.network.leaders, a.nn.deg.network.orgs)$p.value
+wilcox.test(a.nn.deg.network.leaders, a.nn.deg.network.orgs, na.rm=TRUE)$p.value
 
-ggplot(density(a.nn.deg.network.orgs))
+plot(density(a.nn.deg.network.orgs), col="blue")
+lines(density(a.nn.deg.network.leaders), col="green")
 
 # Generamos la matriz
 d1 <- data.frame(density(a.nn.deg.network.leaders)$x, density(a.nn.deg.network.leaders)$y, "Leaders")
@@ -124,9 +120,9 @@ distribuciones <- rbind.data.frame(d1,d2)
 p2 <- ggplot(distribuciones, aes(x=x,y=y,colour = group)) + 
   geom_line() + theme_bw() +
   theme(legend.justification=c(1,1), legend.position=c(1,1), legend.title=element_blank(), panel.grid.minor = element_line(color="grey", linetype="dotted"), panel.grid.major = element_line(color="grey", linetype="dotted")) +
-  xlab("Log Average Neighbor Degree") +
-  ylab("Density") + 
-  scale_x_log10() +
+  xlab("Average Neighbor Indegree") +
+  ylab("Distribution") + 
+  #scale_x_log10() +
   scale_color_manual(values=c("#24C467", "#8AB6FA"))
 
 # Plot distribution
