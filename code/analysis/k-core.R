@@ -55,11 +55,12 @@ for(k in c("retweet", "reply", "mention"))
     hub <- as.data.frame(hub_score(g)$vector)
     authority <- as.data.frame(authority_score(g)$vector)
     page.rank <- as.data.frame(page.rank(g)$vector)
-    betweenness <- betweenness(g, normalized=TRUE)
+    betweenness <- betweenness(g, directed = TRUE, normalized=TRUE)
     closeness <- closeness(g)
     eigenvector <- eigen_centrality(g)$vector
     clustering <- transitivity(g, type="local", isolates="NA")
     constraint <- constraint(g)
+    estimate_betweenness <- estimate_betweenness(g, directed = TRUE, cutoff=50)
     
     # Calculamos los valores
     username <- rownames(indegree)   
@@ -71,7 +72,7 @@ for(k in c("retweet", "reply", "mention"))
     page.rank <- page.rank[,1]
     
     # Armamos la tabla
-    users.metrics <- cbind.data.frame(username, i, degree, indegree, outdegree, hub, authority, page.rank, betweenness, closeness, eigenvector, clustering, constraint)
+    users.metrics <- cbind.data.frame(username, i, degree, indegree, outdegree, hub, authority, page.rank, betweenness, closeness, eigenvector, clustering, constraint, estimate_betweenness)
     users.metrics <- as.data.frame(users.metrics)
     #users.metrics[is.na(users.metrics)] <- 0   
     

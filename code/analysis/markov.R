@@ -88,7 +88,6 @@ total.mention <- dcast(total.mention, source~target, value.var="mention")
 rownames(total.mention) <- total.mention$source
 total.mention$source <- NULL
 
-
 # Imprimimos en Latex
 xtable(total.mention)
 xtable(total.retweet)
@@ -130,9 +129,9 @@ proportion.retweet.string <- matrix(nrow = nrow(proportions.retweet), ncol = nco
 
 for(i in 1:nrow(proportions.mention)){
   for(j in 1:ncol(proportions.mention)){
-    proportion.mention.string[i,j] <- paste0(round(100*proportions.mention[i,j],2)," ",sep="")
-    proportion.reply.string[i,j] <- paste0(round(100*proportions.reply[i,j],2)," ",sep="")
-    proportion.retweet.string[i,j] <- paste0(round(100*proportions.retweet[i,j],2)," ",sep="")
+    proportion.mention.string[i,j] <- paste0(round(100*proportions.mention[i,j],1)," ",sep="")
+    proportion.reply.string[i,j] <- paste0(round(100*proportions.reply[i,j],1)," ",sep="")
+    proportion.retweet.string[i,j] <- paste0(round(100*proportions.retweet[i,j],1)," ",sep="")
   }
 }
 
@@ -166,8 +165,8 @@ colors[,1] <- "#8AB6FA"
 colors[,2] <- "#24C467"
 colors[,3] <- "#F87570"
 colors.nodes <- c("#8AB6FA", "#24C467", "#F87570")
-cex.text <- 0.8
-arr.lwd <- 0.07
+cex.text <- 0.92
+arr.lwd <- 0.1
 arr.length <- 0.07
 arr.width <- 0.07
 arr.pos <- matrix(nrow = nrow(transitionMatrix.reply), ncol = ncol(transitionMatrix.reply), 0.5)
@@ -175,7 +174,7 @@ arr.pos[2,3] <- 0.60
 arr.pos[3,2] <- 0.45
 arr.pos[1,3] <- 0.60
 arr.pos[3,1] <- 0.45
-dtext <- 0.12
+dtext <- 0.15
 
 #Plot final
 pdf("../../plots/markov.pdf",9,3)
